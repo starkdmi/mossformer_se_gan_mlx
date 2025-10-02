@@ -1,0 +1,8 @@
+mlx
+numpy
+tqdm
+soundfile
+huggingface-hub
+pyyaml
+safetensors
+librosa
