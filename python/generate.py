@@ -3,7 +3,7 @@ MossFormer GAN Speech Enhancement - MLX Implementation
 Removes background noise from audio files using deep learning.
 
 Usage:
-    python demo.py --input audio.wav --output ./output --model fp32
+    python generate.py --input audio.wav --output ./output --model fp32
 """
 import os
 import time

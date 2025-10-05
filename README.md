@@ -7,11 +7,10 @@ Speaker enhancement model for separating speech and background sounds into separ
 ### Python
 
 ```bash
+cd python
 pip install -r requirements.txt
-python demo.py --input audio.wav --model fp32
+python generate.py --input audio.wav --model fp32
 ```
-
-See [`demo.py`](python/demo.py) for implementation details.
 
 ## Models
 
