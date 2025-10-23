@@ -4,7 +4,8 @@ Includes: true dilated convolutions, InstanceNorm2d, FSMN_Wrap, and parameter tr
 """
 import mlx.core as mx
 import mlx.nn as nn
-from typing import Optional
+
+from fsmn import UniDeepFsmn
 
 class InstanceNorm2d(nn.Module):
     """MLX implementation of InstanceNorm2d with exact PyTorch broadcasting and dtype"""
@@ -56,60 +57,6 @@ class InstanceNorm2d(nn.Module):
             x_norm = x_norm * self.weight + self.bias
         
         return x_norm.astype(mx.float32)  # Ensure output is float32
-
-class UniDeepFsmn(nn.Module):
-    """Complete MLX implementation of UniDeepFsmn matching PyTorch exactly"""
-    def __init__(self, input_dim: int, output_dim: int, lorder: int = 20, hidden_size: Optional[int] = None):
-        super().__init__()
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.lorder = lorder
-        self.rorder = lorder  # Same as lorder in PyTorch version
-        self.hidden_size = hidden_size if hidden_size is not None else output_dim
-        
-        # Linear layers
-        self.linear = nn.Linear(input_dim, self.hidden_size)
-        self.project = nn.Linear(self.hidden_size, output_dim, bias=False)
-        
-        # 1D convolution for memory matching PyTorch's implementation
-        kernel_size = self.lorder + self.rorder - 1
-        
-        # PyTorch uses input_dim for both in_channels and groups
-        self.conv1 = nn.Conv1d(
-            in_channels=input_dim,
-            out_channels=output_dim,
-            kernel_size=kernel_size,
-            groups=input_dim,
-            bias=False
-        )
-    
-    def __call__(self, input_tensor):
-        # input_tensor shape: (batch * height, time, channels)
-        
-        # Forward path through linear layers
-        f1 = mx.maximum(self.linear(input_tensor), 0)  # ReLU
-        
-        p1 = self.project(f1)
-
-        # For MLX Conv1d, we keep the (N, L, C) format and apply padding to the L dimension (axis=1)
-        padding_left = self.lorder - 1
-        padding_right = self.rorder - 1
-        
-        # Apply padding to time dimension (axis=1 in NLC format)
-        x_padded = mx.pad(p1, [(0, 0), (padding_left, padding_right), (0, 0)])
-        
-        # Apply 1D convolution - MLX conv1d expects (N, L, C) format
-        conv_out = self.conv1(x_padded)
-        
-        # Residual connection in time-channel domain  
-        out = p1 + conv_out
-        
-        # Final residual connection with input only if dimensions match
-        if self.input_dim == self.output_dim:
-            result = input_tensor + out
-            return result
-        else:
-            return out
 
 class FSMN_Wrap(nn.Module):
     """MLX implementation of FSMN_Wrap that matches PyTorch exactly"""

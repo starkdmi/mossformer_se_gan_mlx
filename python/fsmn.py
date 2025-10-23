@@ -2,6 +2,8 @@ import mlx.core as mx
 import mlx.nn as nn
 from typing import Optional
 
+from depthwise_conv1d import Conv1dFast
+
 class UniDeepFsmn(nn.Module):
     """
     MLX implementation of UniDeepFsmn, converted from PyTorch.
@@ -35,7 +37,7 @@ class UniDeepFsmn(nn.Module):
         # The convolution is defined to match the PyTorch version's parameters.
         # It's a depthwise convolution because groups == in_channels.
         # Padding is done manually in the forward pass.
-        self.conv1 = nn.Conv1d(
+        self.conv1 = Conv1dFast( # nn.Conv1d
             in_channels=input_dim,
             out_channels=output_dim,
             kernel_size=kernel_size,
