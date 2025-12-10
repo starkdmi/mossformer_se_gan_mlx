@@ -47,7 +47,7 @@ _depthwise_conv1d_kernel = metal_kernel(
     """,
 )
 
-
+@mx.compile
 def depthwise_conv1d(
     x: mx.array,
     weight: mx.array,

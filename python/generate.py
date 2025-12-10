@@ -6,6 +6,7 @@ Usage:
     python generate.py --input audio.wav --output ./output --model fp32
 """
 import os
+import gc
 import time
 import argparse
 from pathlib import Path
@@ -129,6 +130,7 @@ class MlxInferenceWrapper:
         self.stft_window = create_periodic_hann_window_mlx(self.win_length)
         self.istft_window = self.stft_window
         self.use_binary_mask = getattr(args, 'use_binary_mask', False) # use True for 4-bit
+        self._forward_compiled = mx.compile(self._forward)
 
     def _power_compress(self, real, imag):
         mag = mx.sqrt(real**2 + imag**2 + 1e-8)
@@ -145,8 +147,8 @@ class MlxInferenceWrapper:
         real_uncompress = mag * mx.cos(phase)
         imag_uncompress = mag * mx.sin(phase)
         return mx.stack([real_uncompress, imag_uncompress], axis=-1)
-
-    def __call__(self, inputs: mx.array) -> dict:
+    
+    def _forward(self, inputs):
         input_len = inputs.shape[-1]
         norm_factor = mx.sqrt(input_len / (mx.sum(inputs**2.0, axis=-1, keepdims=True) + 1e-9))
         normed_inputs = inputs * norm_factor
@@ -188,6 +190,10 @@ class MlxInferenceWrapper:
         enhanced_audio /= norm_factor
         background_audio /= norm_factor
         
+        return enhanced_audio, background_audio
+
+    def __call__(self, inputs: mx.array) -> dict:
+        enhanced_audio, background_audio = self._forward_compiled(inputs)
         mx.eval(enhanced_audio, background_audio)
         return {'enhanced_audio': enhanced_audio, 'background_audio': background_audio}
 
@@ -330,6 +336,12 @@ def main():
 
     # Process audio
     print(f"\nProcessing audio (window={cli_args.window_size}s, stride={cli_args.stride}s)...")
+
+    # Clean run
+    # gc.collect()
+    # mx.clear_cache()
+    # Benchmark begin
+    mx.reset_peak_memory()
     start_time = time.time()
 
     enhanced_output, background_output = process_long_audio_by_chunking_mlx(
@@ -337,10 +349,13 @@ def main():
     )
 
     mx.eval(enhanced_output, background_output)
+    # Benchmark finish
     elapsed = time.time() - start_time
+    peak_mem_bytes = mx.get_peak_memory()
 
     print(f"\nProcessing completed in {elapsed:.2f} seconds")
     print(f"Real-time factor: {duration / elapsed:.2f}x")
+    print(f"Peak Memory: {peak_mem_bytes / (1024 * 1024):.2f} MB")
 
     # Save output files
     input_name = Path(cli_args.input).stem
